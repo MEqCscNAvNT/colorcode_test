@@ -153,6 +153,7 @@
             box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
             position: relative;
             overflow: hidden;
+            transition: all 0.2s;
         }
 
         /* リズムエリア */
@@ -181,12 +182,35 @@
         }
 
         /* インジケーター */
-        .phase-timer {
+        .phase-bar-wrapper {
+            position: relative;
+            width: 100%;
             height: 8px;
+            background: #1a252f;
+            border-radius: 4px;
+            margin-top: 5px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+        }
+        .great-zone {
+            position: absolute;
+            left: 33.33%;
+            width: 33.33%;
+            height: 100%;
+            background: rgba(46, 204, 113, 0.4);
+            border-left: 1px solid rgba(255,255,255,0.5);
+            border-right: 1px solid rgba(255,255,255,0.5);
+            z-index: 1;
+        }
+        .phase-timer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
             background: linear-gradient(90deg, #ff9f43, #ee5253);
             width: 100%;
-            margin-top: 5px;
             border-radius: 4px;
+            z-index: 2;
         }
 
         /* キーパッド */
@@ -274,7 +298,11 @@
         <div id="rhythm-area">
             <div class="clap-wrapper" id="clap-container"></div>
         </div>
-        <div id="phase-bar" class="phase-timer"></div>
+        
+        <div class="phase-bar-wrapper">
+            <div class="great-zone"></div>
+            <div id="phase-bar" class="phase-timer"></div>
+        </div>
 
         <div class="keypad">
             <button class="key" onclick="handleInput(1)">1</button>
@@ -313,15 +341,20 @@
         let isPlaying = false;
         let currentTarget = null;
         let beatCount = 0;
-        let beatIntervalId = null;
+        
+        let expectedTime = 0;
+        let beatTimerId = null; 
+        
         let timerIntervalId = null;
-        
-        let baseBpm = 100;    // 基準BPM
-        let currentBpm = 100; // 現在のBPM
-        let beatMs = 600;     // 計算されたms
-        
+        let baseBpm = 100;
+        let currentBpm = 100;
+        let beatMs = 600;
         let isAnswered = false; 
         let isFever = false;
+        
+        let isRecovering = false; 
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
         const ui = document.getElementById('game-ui');
         const settings = document.getElementById('settings-area');
@@ -336,8 +369,6 @@
         const phaseBar = document.getElementById('phase-bar');
         const body = document.body;
         const flashOverlay = document.getElementById('flash-overlay');
-
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
         function playTone(freq, type = 'sine', duration = 0.1, timeOffset = 0, vol = 0.5) {
             const osc = audioCtx.createOscillator();
@@ -359,6 +390,110 @@
             osc.stop(now + duration);
         }
 
+        function playClapSound() {
+            const bufferSize = audioCtx.sampleRate * 0.1;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+
+            const noiseSource = audioCtx.createBufferSource();
+            noiseSource.buffer = buffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 1200;
+            filter.Q.value = 1.0;
+
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+
+            noiseSource.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            noiseSource.start();
+        }
+
+        function playKickSound() {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            
+            osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            
+            gain.gain.setValueAtTime(0.8, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.3);
+        }
+
+        function playJazzBass(freq, timeOffset = 0) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+
+            osc.type = 'sawtooth'; 
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime + timeOffset);
+
+            filter.type = 'lowpass';
+            filter.Q.value = 1.0; 
+
+            const start = audioCtx.currentTime + timeOffset;
+            
+            filter.frequency.setValueAtTime(1000, start);
+            filter.frequency.exponentialRampToValueAtTime(100, start + 0.15);
+            gain.gain.setValueAtTime(0, start);
+            gain.gain.linearRampToValueAtTime(0.7, start + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.001, start + 0.35);
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start(start);
+            osc.stop(start + 0.4);
+        }
+
+        function playJazzPiano(freqs, timeOffset = 0, duration = 0.8) {
+            const start = audioCtx.currentTime + timeOffset;
+            
+            freqs.forEach(freq => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, start);
+                gain.gain.setValueAtTime(0, start);
+                gain.gain.linearRampToValueAtTime(0.08, start + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(start);
+                osc.stop(start + duration + 0.1);
+
+                const tineOsc = audioCtx.createOscillator();
+                const tineGain = audioCtx.createGain();
+                tineOsc.type = 'triangle';
+                tineOsc.frequency.setValueAtTime(freq * 2, start); 
+                tineGain.gain.setValueAtTime(0, start);
+                tineGain.gain.linearRampToValueAtTime(0.03, start + 0.01);
+                tineGain.gain.exponentialRampToValueAtTime(0.001, start + 0.3); 
+                
+                tineOsc.connect(tineGain);
+                tineGain.connect(audioCtx.destination);
+                tineOsc.start(start);
+                tineOsc.stop(start + 0.4);
+            });
+        }
+
         function playSuccessSound(comboCount) {
             const baseFreq = 880; 
             const steps = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
@@ -372,7 +507,7 @@
         function startGame(bpm) {
             baseBpm = bpm;
             currentBpm = bpm;
-            updateTempoVar(); // beatMsの計算
+            updateTempoVar();
 
             score = 0;
             combo = 0;
@@ -382,6 +517,7 @@
             isPlaying = true;
             isAnswered = true; 
             isFever = false;
+            isRecovering = false;
 
             updateUI();
             resetFever();
@@ -396,21 +532,17 @@
 
             if (audioCtx.state === 'suspended') audioCtx.resume();
             
-            runBeat();
-            // インターバル開始
-            beatIntervalId = setInterval(runBeat, beatMs);
+            clearInterval(timerIntervalId);
             timerIntervalId = setInterval(updateTimer, 100);
+
+            clearTimeout(beatTimerId);
+            expectedTime = performance.now();
+            runBeat(); 
         }
 
         function updateTempoVar() {
             beatMs = 60000 / currentBpm;
             bpmDisplay.innerText = `BPM: ${currentBpm}`;
-        }
-
-        // リズム変更を適用する（タイマーを再起動）
-        function updateInterval() {
-            clearInterval(beatIntervalId);
-            beatIntervalId = setInterval(runBeat, beatMs);
         }
 
         function updateTimer() {
@@ -479,23 +611,84 @@
             ui.classList.remove('fever-active');
             body.style.backgroundColor = '#1a1a1a';
             
-            // BPMリセット
             if (currentBpm !== baseBpm) {
                 currentBpm = baseBpm;
                 updateTempoVar();
-                updateInterval();
             }
         }
 
+        const bassLines = [
+            [55.00, 65.41, 82.41, 77.78],   // Bar 0: Am7
+            [73.42, 92.50, 110.00, 103.83], // Bar 1: D7
+            [98.00, 61.74, 73.42, 69.30],   // Bar 2: Gmaj7
+            [65.41, 73.42, 82.41, 87.31],   // Bar 3: Cmaj7
+            [92.50, 110.00, 82.41, 65.41],  // Bar 4: F#m7b5
+            [61.74, 77.78, 92.50, 87.31],   // Bar 5: B7
+            [82.41, 98.00, 123.47, 146.83], // Bar 6: Em7
+            [164.81, 146.83, 123.47, 116.54] // Bar 7: E7
+        ];
+
+        const pianoChords = [
+            [261.63, 329.63, 392.00, 493.88], // Am9
+            [261.63, 329.63, 369.99, 493.88], // D13
+            [246.94, 293.66, 369.99, 440.00], // Gmaj9
+            [246.94, 293.66, 329.63, 392.00], // Cmaj9
+            [220.00, 261.63, 329.63, 392.00], // F#m7b5
+            [220.00, 261.63, 311.13, 392.00], // B7b9
+            [196.00, 246.94, 293.66, 369.99], // Em9
+            [207.65, 293.66, 349.23, 392.00]  // E7b9
+        ];
+
         function runBeat() {
-            if (!isPlaying) return;
+            if (!isPlaying || isRecovering) return;
 
             const phase = beatCount % 4;
+            const bar = Math.floor(beatCount / 4) % 8; 
+            const sec = beatMs / 1000;
+            const eighth = sec / 2; 
 
+            // =====================================
+            // ★ BGM再生（解答状態に関わらず常に鳴らす）
+            // =====================================
+            if (phase === 0) {
+                playTone(300, 'sine', 0.1, 0, 0.4); 
+                playKickSound();
+                if (isFever) {
+                    playJazzBass(bassLines[bar][0], 0);
+                    if (bar === 2 || bar === 5 || bar === 7) playJazzPiano(pianoChords[bar], 0);
+                }
+            }
+            else if (phase === 1) {
+                playClapSound(); 
+                if (isFever) {
+                    playJazzBass(bassLines[bar][1], 0);
+                    if (bar === 0) playJazzPiano(pianoChords[bar], 0); 
+                    if (bar === 4) playJazzPiano(pianoChords[bar], eighth); 
+                }
+            }
+            else if (phase === 2) {
+                playClapSound();
+                playKickSound();
+                if (isFever) {
+                    playJazzBass(bassLines[bar][2], 0);
+                    if (bar === 6) playJazzPiano(pianoChords[bar], 0); 
+                    if (bar === 1) playJazzPiano(pianoChords[bar], eighth); 
+                }
+            }
+            else if (phase === 3) {
+                if (isFever) {
+                    playJazzBass(bassLines[bar][3], 0);
+                    if (bar === 3) playJazzPiano(pianoChords[bar], 0); 
+                }
+            }
+
+            // =====================================
+            // ★ ゲームロジック・UI更新（まだ解答していない場合のみ）
+            // =====================================
             if (phase === 0) {
                 if (beatCount > 0 && !isAnswered) {
                     handleMiss("時間切れ");
-                    if (!isPlaying) return; 
+                    return; 
                 }
                 
                 isAnswered = false;
@@ -513,32 +706,35 @@
 
                 clapContainer.innerHTML = '';
                 rhythmArea.style.fontSize = "2.8rem";
-
-                playTone(100, 'sine', 0.1, 0, 0.8);
             }
             else if (phase === 1) {
                 if (!isAnswered) {
                     clapContainer.innerHTML = '<span class="clap-item clap-visible">👏</span><span class="clap-item">👏</span>';
-                    playTone(400, 'square', 0.05, 0, 0.3);
                 }
             }
             else if (phase === 2) {
                 if (!isAnswered) {
                     const items = clapContainer.querySelectorAll('.clap-item');
                     if (items.length > 1) items[1].classList.add('clap-visible');
-                    playTone(400, 'square', 0.05, 0, 0.3); 
-                    playTone(400, 'square', 0.05, 0.15, 0.3);
+                    startPhaseBar(beatMs * 2);
                 }
             }
             else if (phase === 3) {
                 if (!isAnswered) {
                     clapContainer.innerHTML = '<span class="sharp-text" style="color:#e74c3c;">???</span>';
-                    playTone(600, 'sine', 0.1, 0, 0.2);
-                    startPhaseBar();
+                    playTone(800, 'sine', 0.1, 0, 0.2);
                 }
             }
 
             beatCount++;
+
+            expectedTime += beatMs;
+            let delay = expectedTime - performance.now();
+            if (delay < 0) {
+                expectedTime = performance.now(); 
+                delay = 0;
+            }
+            beatTimerId = setTimeout(runBeat, delay);
         }
 
         function resetPhaseBar() {
@@ -546,21 +742,20 @@
             phaseBar.style.width = '100%';
         }
         
-        function startPhaseBar() {
-            phaseBar.style.transition = `width ${beatMs}ms linear`;
+        function startPhaseBar(duration) {
+            phaseBar.style.transition = `width ${duration}ms linear`;
             requestAnimationFrame(() => {
                 phaseBar.style.width = '0%';
             });
         }
 
         function handleInput(num) {
-            if (!isPlaying) return;
+            if (!isPlaying || isRecovering) return;
             if (isAnswered) return;
 
             const phase = (beatCount - 1) % 4;
 
-            // お手つき判定
-            if (phase !== 3) {
+            if (phase === 0 || phase === 1) {
                 isAnswered = true;
                 clapContainer.innerHTML = '<span class="sharp-text" style="color:#e74c3c; font-size:1.5rem;">お手つき×</span>';
                 handleMiss("お手つき");
@@ -569,31 +764,47 @@
 
             isAnswered = true;
 
+            const currentWidth = phaseBar.getBoundingClientRect().width;
+            const parentWidth = phaseBar.parentElement.getBoundingClientRect().width;
+            const percentage = (currentWidth / parentWidth) * 100;
+
+            phaseBar.style.transition = 'none';
+            phaseBar.style.width = percentage + '%';
+
             if (num === currentTarget.val) {
-                // 正解
                 combo++;
                 checkFever();
 
+                let baseScore = 0;
+                let okText = "";
+                let okColor = "";
+                let fontSize = "2rem";
+
+                if (percentage >= 33.33 && percentage <= 66.66) {
+                    baseScore = 100;
+                    okText = isFever ? 'FEVER GREAT!!' : 'GREAT!!';
+                    okColor = isFever ? '#f1c40f' : '#2ecc71'; 
+                    fontSize = "2.4rem"; 
+                } else {
+                    baseScore = 50;
+                    okText = isFever ? 'FEVER GOOD!' : 'GOOD!';
+                    okColor = isFever ? '#e67e22' : '#3498db'; 
+                }
+
                 const multiplier = isFever ? 3 : 1;
-                score += (100 * multiplier) + (combo * 10);
+                score += (baseScore * multiplier) + (combo * 10);
                 
                 timeLeft = Math.min(timeLeft + 1.5, 30); 
 
                 playSuccessSound(combo);
                 triggerFlash(); 
-
-                const okColor = isFever ? '#f1c40f' : '#2ecc71';
-                const okText = isFever ? 'FEVER!!' : 'PERFECT!';
                 
-                clapContainer.innerHTML = `<span class="sharp-text" style="color:${okColor}; font-size:2rem;">${okText}</span>`;
+                clapContainer.innerHTML = `<span class="sharp-text" style="color:${okColor}; font-size:${fontSize};">${okText}</span>`;
                 
-                // --- 追加機能: フィーバー中のBPM加速 ---
                 if (isFever) {
-                    currentBpm += 5; // 5ずつ上昇
+                    currentBpm += 5;
                     updateTempoVar();
-                    updateInterval(); // リズムタイマー再起動
                 }
-                // ------------------------------------
 
                 updateUI();
                 nextQuestion();
@@ -604,8 +815,11 @@
         }
 
         function handleMiss(reason) {
+            if (isRecovering) return;
+            isRecovering = true;
+            
             combo = 0;
-            resetFever(); // ここでBPMが元に戻る
+            resetFever(); 
             triggerShake(); 
             
             playTone(150, 'sawtooth', 0.4);
@@ -613,20 +827,41 @@
 
             lives--;
             updateUI();
-            
-            nextQuestion();
 
             if (lives <= 0) {
                 endGame("GAME OVER");
+                return;
             }
+
+            clearTimeout(beatTimerId);
+
+            clapContainer.innerHTML = `<span class="sharp-text" style="color:#e74c3c; font-size:2rem;">${reason}</span>`;
+            colorCard.innerText = 'WAIT...';
+            colorCard.style.backgroundColor = '#95a5a6';
+            colorCard.style.color = '#fff';
+            colorCard.style.transform = "scale(0.9)";
+            resetPhaseBar();
+
+            setTimeout(() => {
+                if (!isPlaying) return;
+                isRecovering = false;
+                beatCount = 0; 
+                expectedTime = performance.now(); 
+                nextQuestion();
+                runBeat();
+            }, 1500);
         }
 
         function endGame(msg) {
             isPlaying = false;
-            clearInterval(beatIntervalId);
+            clearTimeout(beatTimerId);
             clearInterval(timerIntervalId);
             phaseBar.style.transition = 'none';
             resetFever();
+            
+            if (audioCtx.state === 'running') {
+                audioCtx.suspend();
+            }
             
             setTimeout(() => {
                 alert(`${msg}\n\nSCORE: ${score}\nMAX COMBO: ${combo}`);
