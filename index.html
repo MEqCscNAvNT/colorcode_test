@@ -2,9 +2,16 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>抵抗カラーコード - RESISTOR RUSH (Speed Fever)</title>
     <style>
+        /* スマホでの画面ズレ・スワイプを完全に防ぐための設定 */
+        html {
+            overflow: hidden;
+            touch-action: none;
+            overscroll-behavior: none;
+        }
+
         body {
             font-family: 'Arial Black', sans-serif;
             background-color: #1a1a1a;
@@ -14,8 +21,11 @@
             justify-content: center;
             height: 100vh;
             margin: 0;
-            user-select: none;
+            user-select: none; /* テキスト選択防止 */
+            -webkit-user-select: none; /* Safari用テキスト選択防止 */
             overflow: hidden;
+            touch-action: none; /* デフォルトのタッチアクションを無効化 */
+            overscroll-behavior: none; /* スクロール端のバウンスを無効化 */
             color: #fff;
             transition: background-color 0.5s ease;
         }
@@ -231,6 +241,7 @@
             transition: all 0.05s;
             color: #2c3e50;
             font-weight: 900;
+            touch-action: manipulation; /* 連打時のズーム防止 */
         }
         .key:active { transform: translateY(5px); box-shadow: none; }
         
@@ -321,6 +332,11 @@
     </div>
 
     <script>
+        // ★ スマホのスワイプによる画面スクロールをJavaScriptからも強制ブロック
+        document.addEventListener('touchmove', function(event) {
+            event.preventDefault();
+        }, { passive: false });
+
         const colors = [
             { val: 0, name: '黒', hex: '#000000', text: 'white' },
             { val: 1, name: '茶', hex: '#8B4513', text: 'white' },
