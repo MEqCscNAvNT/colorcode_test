@@ -112,7 +112,6 @@ function playJazzBass(freq, timeOffset = 0) {
     const gain = audioCtx.createGain();
     const filter = audioCtx.createBiquadFilter();
     
-    // 現在のBPMから、1拍の秒数を計算
     const duration = beatMs / 1000; 
 
     osc.type = 'sawtooth'; 
@@ -122,17 +121,13 @@ function playJazzBass(freq, timeOffset = 0) {
     filter.Q.value = 1.0; 
     const start = audioCtx.currentTime + timeOffset;
     
-    // フィルターの設定：音の芯を残すため、少し高めで維持
     filter.frequency.setValueAtTime(800, start);
     filter.frequency.exponentialRampToValueAtTime(200, start + duration); 
     
     gain.gain.setValueAtTime(0, start);
-    gain.gain.linearRampToValueAtTime(0.7, start + 0.01); // アタック
+    gain.gain.linearRampToValueAtTime(0.7, start + 0.01); 
     
-    // ★ここが重要：次の拍の直前（durationの95%）まで、音量を30%維持する
     gain.gain.exponentialRampToValueAtTime(0.3, start + duration * 0.95);
-    
-    // 次の拍が鳴る瞬間に一瞬で音を消して、重なりによるノイズを防ぐ
     gain.gain.linearRampToValueAtTime(0.0001, start + duration);
 
     osc.connect(filter);
@@ -216,6 +211,23 @@ function startGame(bpm) {
     runBeat(); 
 }
 
+// ★追加：タイトル画面に戻る処理
+function backToTitle() {
+    isPlaying = false;
+    clearTimeout(beatTimerId);
+    clearInterval(timerIntervalId);
+    
+    if (audioCtx.state === 'running') {
+        audioCtx.suspend();
+    }
+    
+    resetFever();
+    
+    document.getElementById('result-modal').classList.add('hidden');
+    ui.classList.add('hidden');
+    settings.classList.remove('hidden');
+}
+
 function updateTempoVar() {
     beatMs = 60000 / currentBpm;
     bpmDisplay.innerText = `BPM: ${currentBpm}`;
@@ -291,8 +303,6 @@ function resetFever() {
     }
 }
 
-// 8小節のブギウギ・ブルース進行 (Key: C)
-// パターン: ルート → 3度 → 5度 → 6度 | 7度 → 6度 → 5度 → 3度
 const bassLines = [
     [65.41, 82.41, 98.00, 110.00],  // Bar 0: C7 (上り)
     [116.54, 110.00, 98.00, 82.41], // Bar 1: C7 (下り)
@@ -315,7 +325,6 @@ const pianoChords = [
     [392.00, 493.88, 587.33, 698.46]  // Bar 7: G7
 ];
 
-// ★ 引数 isFeverStart を追加
 function runBeat(isFeverStart = false) {
     if (!isPlaying || isRecovering) return;
 
@@ -357,7 +366,6 @@ function runBeat(isFeverStart = false) {
     }
 
     if (phase === 0) {
-        // ★ フィーバー突入時の強制頭出しの場合はミス判定をスルーする
         if (beatCount > 0 && !isAnswered && !isFeverStart) {
             handleMiss("TOO SLOW!"); 
             return; 
@@ -374,16 +382,19 @@ function runBeat(isFeverStart = false) {
             { transform: 'scale(1) translateY(0)', opacity: 1 }
         ], { duration: 150, easing: 'ease-out' });
 
-        // ★ フィーバー突入の瞬間は褒め言葉を残すため消さない
         if (!isFeverStart) {
             clapContainer.innerHTML = '';
         }
         rhythmArea.style.fontSize = "2.8rem";
     }
     else if (phase === 1) {
-        if (!isAnswered) clapContainer.innerHTML = '<span class="clap-item clap-visible">👏</span><span class="clap-item">👏</span>';
+        // ★復元：2拍目に1つ目の手を出す
+        if (!isAnswered) {
+            clapContainer.innerHTML = '<span class="clap-item clap-visible">👏</span><span class="clap-item">👏</span>';
+        }
     }
     else if (phase === 2) {
+        // ★復元：3拍目に2つ目の手を出してバーを動かす
         if (!isAnswered) {
             const items = clapContainer.querySelectorAll('.clap-item');
             if (items.length > 1) items[1].classList.add('clap-visible');
@@ -439,7 +450,6 @@ function handleInput(num) {
         combo++;
         if (combo > maxCombo) maxCombo = combo;
         
-        // ★ 今回の入力でちょうどフィーバーに突入したか判定
         let justEnteredFever = false;
         if (combo === 5 && !isFever) {
             justEnteredFever = true;
@@ -478,19 +488,17 @@ function handleInput(num) {
             currentBpm += 5;
             updateTempoVar();
         } else if (justEnteredFever) {
-            // 突入直後はテンポアップのみ反映（加算は次回から）
             updateTempoVar(); 
         }
 
         updateUI();
         nextQuestion();
 
-        // ★ フィーバー突入時：強制的にBGMとリズムを頭出しする
         if (justEnteredFever) {
             clearTimeout(beatTimerId);
             beatCount = 0;
             expectedTime = performance.now();
-            runBeat(true); // isFeverStartフラグを立てて実行
+            runBeat(true); 
             return;
         }
 
