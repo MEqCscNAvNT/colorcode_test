@@ -14,9 +14,9 @@
         <h2>COLOR CODE PANIC</h2>
         
         <div class="difficulty-buttons">
-            <button class="diff-btn btn-slow" onpointerdown="startGame(100)">SLOW <span>(BPM 100)</span></button>
+            <button class="diff-btn btn-easy" onpointerdown="startGame(100)">EASY <span>(BPM 100)</span></button>
             <button class="diff-btn btn-normal" onpointerdown="startGame(120)">NORMAL <span>(BPM 120)</span></button>
-            <button class="diff-btn btn-fast" onpointerdown="startGame(200)">INSANE <span>(BPM 200)</span></button>
+            <button class="diff-btn btn-fast" onpointerdown="startGame(200)">EXTREME <span>(BPM 200)</span></button>
         </div>
     </div>
 
@@ -75,7 +75,8 @@
                 <p>MAX COMBO <br><span id="result-combo" class="result-num">0</span></p>
             </div>
             <div class="result-buttons">
-                <button class="btn-retry" onpointerdown="backToTitle()">RETRY</button>
+                <button class="btn-share" onclick="shareOnX()">𝕏 でポスト</button>
+                <button class="btn-retry" onpointerdown="backToTitle()">BACK TO TITLE</button>
             </div>
         </div>
     </div>
