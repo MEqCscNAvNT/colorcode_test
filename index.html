@@ -14,13 +14,14 @@
         <h2>COLOR CODE PANIC</h2>
         
         <div class="difficulty-buttons">
-            <button class="diff-btn btn-slow" onpointerdown="startGame(100)">SLOW <span>(BPM 100)</span></button>
-            <button class="diff-btn btn-normal" onpointerdown="startGame(120)">NORMAL <span>(BPM 120)</span></button>
-            <button class="diff-btn btn-fast" onpointerdown="startGame(200)">INSANE <span>(BPM 200)</span></button>
+            <button class="diff-btn btn-slow" onclick="startGame(100)">SLOW <span>(BPM 100)</span></button>
+            <button class="diff-btn btn-normal" onclick="startGame(120)">NORMAL <span>(BPM 120)</span></button>
+            <button class="diff-btn btn-fast" onclick="startGame(200)">INSANE <span>(BPM 200)</span></button>
         </div>
     </div>
 
     <div id="game-ui" class="game-container hidden">
+        
         <div id="fever-overlay" class="fever-text">FEVER TIME!! x3 SCORE</div>
 
         <div class="info-header">
@@ -41,21 +42,22 @@
         </div>
         
         <div class="phase-bar-wrapper">
+            <div class="great-zone"></div>
             <div id="phase-bar" class="phase-timer"></div>
         </div>
 
         <div class="keypad">
-            <button class="key" onpointerdown="handleInput(1)">1</button>
-            <button class="key" onpointerdown="handleInput(2)">2</button>
-            <button class="key" onpointerdown="handleInput(3)">3</button>
-            <button class="key" onpointerdown="handleInput(4)">4</button>
-            <button class="key" onpointerdown="handleInput(5)">5</button>
-            <button class="key" onpointerdown="handleInput(6)">6</button>
-            <button class="key" onpointerdown="handleInput(7)">7</button>
-            <button class="key" onpointerdown="handleInput(8)">8</button>
-            <button class="key" onpointerdown="handleInput(9)">9</button>
+            <button class="key" onclick="handleInput(1)">1</button>
+            <button class="key" onclick="handleInput(2)">2</button>
+            <button class="key" onclick="handleInput(3)">3</button>
+            <button class="key" onclick="handleInput(4)">4</button>
+            <button class="key" onclick="handleInput(5)">5</button>
+            <button class="key" onclick="handleInput(6)">6</button>
+            <button class="key" onclick="handleInput(7)">7</button>
+            <button class="key" onclick="handleInput(8)">8</button>
+            <button class="key" onclick="handleInput(9)">9</button>
             <button class="key" disabled style="opacity:0.3; background:#95a5a6;">*</button>
-            <button class="key" onpointerdown="handleInput(0)">0</button>
+            <button class="key" onclick="handleInput(0)">0</button>
             <button class="key" disabled style="opacity:0.3; background:#95a5a6;">#</button>
         </div>
     </div>
@@ -73,7 +75,7 @@
                 <p>MAX COMBO <br><span id="result-combo" class="result-num">0</span></p>
             </div>
             <div class="result-buttons">
-                <button class="btn-retry" onpointerdown="backToTitle()">BACK TO TITLE</button>
+                <button class="btn-retry" onclick="location.reload()">RETRY</button>
             </div>
         </div>
     </div>
