@@ -388,12 +388,6 @@ body {
     text-shadow: 2px 2px 0 #000;
 }
 
-.result-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
 .btn-retry {
     padding: 15px;
     font-size: 1.2rem;
@@ -404,6 +398,7 @@ body {
     box-shadow: 0 5px 0 rgba(0,0,0,0.3);
     color: #fff;
     background-color: #3498db;
+    width: 100%;
 }
 .btn-retry:active { transform: translateY(5px); box-shadow: none; }
 
